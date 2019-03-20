@@ -9,30 +9,9 @@ import IdpCallback from './components/IdpCallback'
 import IdpSelect from './components/IdpSelect'
 import NoParent from './components/NoParent'
 
-import './index.css'
+import defaultIdps from './idps.json'
 
-const defaultIdps = [
-  {
-    displayName: 'Solid Community',
-    url: 'https://solid.community/',
-    iconUrl: 'https://solidtest.space/favicon.ico'
-  },
-  {
-    displayName: 'Solid Test Space',
-    url: 'https://solidtest.space/',
-    iconUrl: 'https://solidtest.space/favicon.ico'
-  },
-  {
-    displayName: 'OpenLink WebID-OIDC Authentication Service',
-    url: 'https://solid.openlinksw.com:8444/',
-    iconUrl: 'https://solidtest.space/favicon.ico'
-  },
-  {
-    displayName: 'OpenLink Data Spaces (QA Server)',
-    url: 'https://ods-qa.openlinksw.com',
-    iconUrl: 'https://solidtest.space/favicon.ico'
-  }
-]
+import './index.css'
 
 findAppOrigin()
   .then(appOrigin => {
@@ -53,11 +32,7 @@ findAppOrigin()
     } else {
       const idps = [...defaultIdps]
       if (!idps.some(idp => idp.url === baseUrl)) {
-        idps.unshift({
-          displayName: host,
-          url: baseUrl,
-          iconUrl: baseUrl + 'favicon.ico'
-        })
+        idps.unshift({ displayName: host, url: baseUrl })
       }
       element = (
         <IdpSelect idps={idps} appOrigin={appOrigin} appName={appName} />
