@@ -7,7 +7,7 @@ import type { Session } from './session'
 import { getSession, saveSession, clearSession } from './session'
 import type { AsyncStorage } from './storage'
 import { defaultStorage } from './storage'
-import { currentUrlNoParams } from './url-util'
+import { toUrlString, currentUrlNoParams } from './url-util'
 import * as WebIdOidc from './webid-oidc'
 
 // Store the global fetch, so the user is free to override it
@@ -20,7 +20,10 @@ export type loginOptions = {
 }
 
 export default class SolidAuthClient extends EventEmitter {
+  _pendingSession: ?Promise<?Session>
+
   fetch(input: RequestInfo, options?: RequestOptions): Promise<Response> {
+    this.emit('request', toUrlString(input))
     return authnFetch(defaultStorage(), globalFetch, input, options)
   }
 
@@ -50,18 +53,26 @@ export default class SolidAuthClient extends EventEmitter {
   async currentSession(
     storage: AsyncStorage = defaultStorage()
   ): Promise<?Session> {
-    let session = await getSession(storage)
+    // Try to obtain a stored or pending session
+    let session = this._pendingSession || (await getSession(storage))
+
+    // If none found, attempt to create a new session
     if (!session) {
+      // Try to create a new OIDC session from stored tokens
       try {
-        session = await WebIdOidc.currentSession(storage)
+        this._pendingSession = WebIdOidc.currentSession(storage)
+        session = await this._pendingSession
       } catch (err) {
         console.error(err)
       }
+
+      // Save the new session and emit session events
       if (session) {
+        await saveSession(storage)(session)
         this.emit('login', session)
         this.emit('session', session)
-        await saveSession(storage)(session)
       }
+      delete this._pendingSession
     }
     return session
   }
