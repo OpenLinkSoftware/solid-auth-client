@@ -16,7 +16,19 @@
     "url": "https://solid.openlinksw.com:8444/"
   },
   {
+    "displayName": "OpenLink Solid Server ver:5.x",
+    "url": "https://solid.openlinksw.com:8445/"
+  },
+  {
     "displayName": "OpenLink Data Spaces (QA Server)",
     "url": "https://ods-qa.openlinksw.com"
+  },
+  {
+    "displayName": "OpenLink URIBurner Service",
+    "url": "https://linkeddata.uriburner.com"
+  },
+  {
+    "displayName": "OpenLink My Service",
+    "url": "https://my.openlinksw.com"
   }
 ]
