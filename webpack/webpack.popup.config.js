@@ -1,6 +1,6 @@
 /* HTML bundle of the popup application */
 
-const CleanWebpackPlugin = require('clean-webpack-plugin')
+const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const HtmlWebpackInlineSourcePlugin = require('html-webpack-inline-source-plugin')
 const path = require('path')
@@ -10,7 +10,8 @@ const {
   context,
   mode,
   module: _module,
-  externals
+  externals,
+  devtool
 } = require('./webpack.common.config')
 
 const outputDir = './dist-popup'
@@ -29,23 +30,25 @@ module.exports = {
   externals,
   resolve: {
     alias: {
-      react: 'preact-compat',
-      'react-dom': 'preact-compat'
+      react: 'preact/compat',
+      'react-dom': 'preact/compat'
     }
   },
   plugins: [
     new EnvironmentPlugin({
       'APP_NAME': '',
     }),
-    new CleanWebpackPlugin([outputDir]),
+    new CleanWebpackPlugin(),
     new HtmlWebpackPlugin({
       template: 'popup-app/index.ejs',
       filename: 'popup-template.html',
       inlineSource: '.(js|css)$'
     }),
-    new HtmlWebpackInlineSourcePlugin()
+    new HtmlWebpackInlineSourcePlugin(HtmlWebpackPlugin)
   ],
+  devtool,
   devServer: {
-    contentBase: path.join(__dirname, 'dist')
+    contentBase: outputDir,
+    port: 8606
   }
 }

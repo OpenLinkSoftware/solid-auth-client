@@ -12,20 +12,9 @@ export interface AsyncStorage {
 export type Storage = Storage | AsyncStorage
 
 export const defaultStorage = () => {
-  try {
-    if (window && window.localStorage) {
-      return asyncStorage(window.localStorage)
-    }
-  } catch (e) {
-    if (!(e instanceof ReferenceError)) {
-      throw e
-    }
-  }
-  console.warn(
-    `'window.localStorage' unavailable.  ` +
-      `Creating a (not very useful) in-memory storage object as the default storage interface.`
-  )
-  return asyncStorage(memStorage())
+  const hasLocalStorage =
+    typeof window !== 'undefined' && 'localStorage' in window
+  return asyncStorage(hasLocalStorage ? window.localStorage : memStorage())
 }
 
 /**
@@ -50,7 +39,7 @@ export async function getData(store: Storage): Promise<Object> {
  */
 export async function updateStorage(
   store: Storage,
-  update: Object => Object
+  update: (Object) => Object
 ): Promise<Object> {
   const currentData = await getData(store)
   const newData = update(currentData)
@@ -73,7 +62,7 @@ export function asyncStorage(storage: Storage): AsyncStorage {
 
     removeItem: (key: string): Promise<void> => {
       return Promise.resolve(storage.removeItem(key))
-    }
+    },
   }
 }
 
@@ -89,7 +78,7 @@ export const memStorage = (): Storage => {
     },
     removeItem: (key: string): void => {
       delete store[key]
-    }
+    },
   }
 }
 
@@ -102,6 +91,6 @@ export function ipcStorage(client: Client): AsyncStorage {
       client.request('storage/setItem', key, val),
 
     removeItem: (key: string): Promise<void> =>
-      client.request('storage/removeItem', key)
+      client.request('storage/removeItem', key),
   }
 }

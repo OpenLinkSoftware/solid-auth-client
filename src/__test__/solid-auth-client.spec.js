@@ -26,11 +26,11 @@ const oidcConfiguration = {
   jwks_uri: 'https://localhost/jwks',
   registration_endpoint: 'https://localhost/register',
   authorization_endpoint: 'https://localhost/authorize',
-  end_session_endpoint: 'https://localhost/logout'
+  end_session_endpoint: 'https://localhost/logout',
 }
 
 const oidcRegistration = {
-  client_id: 'the-client-id'
+  client_id: 'the-client-id',
 }
 
 const pem = fs.readFileSync(path.join(__dirname, './id_rsa'))
@@ -44,13 +44,13 @@ const jwks = {
       { kid: '1', alg: 'RS256', use: 'sig', key_ops: ['verify'] },
       // serialize just the public key
       'public'
-    )
-  ]
+    ),
+  ],
 }
 
 const sessionKey = JSON.stringify(sessionKeys.private)
 
-const verifySerializedKey = ssk => {
+const verifySerializedKey = (ssk) => {
   const key = JSON.parse(ssk)
   const actualFields = Object.keys(key)
   const expectedFields = [
@@ -65,7 +65,7 @@ const verifySerializedKey = ssk => {
     'dq',
     'qi',
     'key_ops',
-    'ext'
+    'ext',
   ]
   expect(new Set(actualFields)).toEqual(new Set(expectedFields))
 }
@@ -75,9 +75,9 @@ const fakeSession = {
   webId: 'https://person.me/#me',
   authorization: {
     access_token: 'fake_access_token',
-    id_token: 'abc.def.ghi'
+    id_token: 'abc.def.ghi',
   },
-  sessionKey
+  sessionKey,
 }
 
 beforeEach(() => {
@@ -155,7 +155,7 @@ describe('login', () => {
         .reply(200, oidcRegistration)
 
       await instance.login('https://localhost', {
-        callbackUri: 'https://app.biz/welcome/'
+        callbackUri: 'https://app.biz/welcome/',
       })
       const location = new window.URL(window.location.href)
       expect(location.origin).toEqual('https://localhost')
@@ -194,6 +194,36 @@ describe('login', () => {
       )
       expect(location.searchParams.get('scope')).toEqual('openid')
       expect(location.searchParams.get('client_id')).toEqual('the-client-id')
+    })
+
+    it('performs the client registration the the correct provided registration parameters', async () => {
+      let requestBody = {}
+      nock('https://localhost/')
+        .get('/.well-known/openid-configuration')
+        .reply(200, oidcConfiguration)
+        .get('/jwks')
+        .reply(200, jwks)
+        .post('/register', (body) => {
+          requestBody = body
+          return true
+        })
+        .reply(200, oidcRegistration)
+
+      await instance.login('https://localhost', {
+        clientName: 'My Example',
+        'clientName#ja-Jpan-JP': 'クライアント名',
+        logoUri: 'https://client.example.org/logo.png',
+        contacts: ['ve7jtb@example.org', 'mary@example.org'],
+      })
+
+      expect(requestBody).toMatchObject({
+        client_name: 'My Example',
+        'client_name#ja-Jpan-JP': 'クライアント名',
+        contacts: ['ve7jtb@example.org', 'mary@example.org'],
+        logo_uri: 'https://client.example.org/logo.png',
+      })
+
+      expect.assertions(1)
     })
   })
 })
@@ -254,7 +284,7 @@ describe('currentSession', () => {
           aud: oidcRegistration.client_id,
           exp: Math.floor(Date.now() / 1000) + 60 * 60, // one hour
           sub: 'https://person.me/#me',
-          nonce
+          nonce,
         },
         pem,
         { algorithm: alg }
@@ -381,6 +411,24 @@ describe('trackSession', () => {
   })
 })
 
+describe('stopTrackSession', () => {
+  it('does not call callback on session change', async () => {
+    expect.assertions(4)
+
+    const callback = jest.fn()
+    await instance.trackSession(callback)
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenLastCalledWith(null)
+
+    instance.stopTrackSession(callback)
+
+    const session = {}
+    instance.emit('session', session)
+    expect(callback).toHaveBeenCalledTimes(1)
+    expect(callback).toHaveBeenLastCalledWith(null)
+  })
+})
+
 describe('logout', () => {
   describe('WebID-OIDC', () => {
     let expectedIdToken, expectedAccessToken
@@ -424,7 +472,7 @@ describe('logout', () => {
           aud: oidcRegistration.client_id,
           exp: Math.floor(Date.now() / 1000) + 60 * 60, // one hour
           sub: 'https://person.me/#me',
-          nonce
+          nonce,
         },
         pem,
         { algorithm: alg }
@@ -498,7 +546,7 @@ describe('logout', () => {
 })
 
 describe('fetch', () => {
-  const matchAuthzHeader = origin => headerVal => {
+  const matchAuthzHeader = (origin) => (headerVal) => {
     const popToken = jwt.decode(headerVal[0].split(' ')[1])
     return (
       popToken.aud === origin &&
@@ -506,6 +554,18 @@ describe('fetch', () => {
       popToken.token_type === 'pop'
     )
   }
+
+  it('fires the request event', async () => {
+    nock('https://third-party.com').get('/resource').reply(200)
+
+    const allArgs = []
+    const collectArgs = allArgs.push.bind(allArgs)
+    instance.on('request', collectArgs)
+    await instance.fetch('https://third-party.com/resource')
+    instance.removeListener('request', collectArgs)
+
+    expect(allArgs).toEqual(['https://third-party.com/resource'])
+  })
 
   it('handles 401s from WebID-OIDC resources by resending with credentials', async () => {
     expect.assertions(1)
@@ -524,7 +584,7 @@ describe('fetch', () => {
     expect(resp.status).toBe(200)
   })
 
-  it('merges request headers with the authorization header', async () => {
+  it('merges an object of request headers with the authorization header', async () => {
     await saveSession(window.localStorage)(fakeSession)
 
     nock('https://third-party.com')
@@ -538,9 +598,72 @@ describe('fetch', () => {
     const resp = await instance.fetch(
       'https://third-party.com/private-resource',
       {
-        headers: { accept: 'text/plain' }
+        headers: { accept: 'text/plain' },
       }
     )
+    expect(resp.status).toBe(200)
+  })
+
+  it('merges a Headers object with the authorization header', async () => {
+    await saveSession(window.localStorage)(fakeSession)
+
+    nock('https://third-party.com')
+      .get('/private-resource')
+      .reply(401, '', { 'www-authenticate': 'Bearer scope="openid webid"' })
+      .get('/private-resource')
+      .matchHeader('accept', 'text/plain')
+      .matchHeader('authorization', matchAuthzHeader('https://third-party.com'))
+      .reply(200)
+
+    const resp = await instance.fetch(
+      'https://third-party.com/private-resource',
+      {
+        headers: {
+          forEach: (iterate) => iterate('text/plain', 'accept'),
+        },
+      }
+    )
+    expect(resp.status).toBe(200)
+  })
+
+  it('accepts a Headers object when no authentication is needed', async () => {
+    await saveSession(window.localStorage)(fakeSession)
+
+    nock('https://third-party.com')
+      .get('/public-resource')
+      .matchHeader('accept', 'text/plain')
+      .reply(200)
+
+    const resp = await instance.fetch(
+      'https://third-party.com/public-resource',
+      {
+        headers: {
+          forEach: (iterate) => iterate('text/plain', 'accept'),
+        },
+      }
+    )
+    expect(resp.status).toBe(200)
+  })
+
+  // skipped because isomorphic-fetch does not support Request as first parameter;
+  // it works in the browser
+  it.skip('merges headers in a Request object with the authorization header', async () => {
+    await saveSession(window.localStorage)(fakeSession)
+
+    nock('https://third-party.com')
+      .get('/private-resource')
+      .reply(401, '', { 'www-authenticate': 'Bearer scope="openid webid"' })
+      .get('/private-resource')
+      .matchHeader('accept', 'text/plain')
+      .matchHeader('authorization', matchAuthzHeader('https://third-party.com'))
+      .reply(200)
+
+    const resp = await instance.fetch({
+      url: 'https://third-party.com/private-resource',
+      headers: {
+        forEach: (iterate) => iterate('text/plain', 'accept'),
+      },
+    })
     expect(resp.status).toBe(200)
   })
 
@@ -548,9 +671,7 @@ describe('fetch', () => {
     expect.assertions(1)
     await saveSession(window.localStorage)(fakeSession)
 
-    nock('https://third-party.com')
-      .get('/protected-resource')
-      .reply(401)
+    nock('https://third-party.com').get('/protected-resource').reply(401)
 
     const resp = await instance.fetch(
       'https://third-party.com/protected-resource'
@@ -627,7 +748,7 @@ describe('fetch', () => {
 
       await saveHost(window.localStorage)({
         url: 'third-party.com',
-        requiresAuth: true
+        requiresAuth: true,
       })
 
       nock('https://third-party.com')

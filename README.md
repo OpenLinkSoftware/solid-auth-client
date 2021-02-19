@@ -1,15 +1,25 @@
-# A library for reading and writing to Solid pods
+# A library for reading and writing to legacy Solid pods
 
 [![Build Status](https://travis-ci.org/solid/solid-auth-client.svg?branch=master)](https://travis-ci.org/solid/solid-auth-client)
 [![Coverage Status](https://coveralls.io/repos/github/solid/solid-auth-client/badge.svg?branch=master)](https://coveralls.io/github/solid/solid-auth-client?branch=master)
+[![NPM Package](https://img.shields.io/npm/v/solid-auth-client.svg)](https://www.npmjs.com/package/solid-auth-client)
 
-The [Solid](https://solid.mit.edu/) project
+The [Solid](https://solidproject.org/) project
 allows people to use apps on the Web
 while storing their data in their own data pod.
 
-`solid-auth-client` is a browser library that allows
-your apps to securely log in to Solid data pods
-and read and write data from them.
+`solid-auth-client` is a legacy browser library
+that allows your apps to log in and read/write data using
+a [Node Solid Server](https://github.com/solid/node-solid-server/).
+
+**⚠️ New projects should use [solid-client-authn](https://github.com/inrupt/solid-client-authn-js)
+or [solid-auth-fetcher](https://github.com/solid/solid-auth-fetcher) instead,
+which leverage the secure DPoP authentication mechanism
+from the current [Solid specification](https://solid.github.io/authentication-panel/solid-oidc/),
+as implemented by
+the [Community Solid Server](https://github.com/solid/community-server/)
+and
+the [Enterprise Solid Server](https://inrupt.com/products/enterprise-solid-server/).**
 
 ## Usage
 In the browser, the library is accessible through `solid.auth`:
@@ -50,7 +60,8 @@ This library offers two main types of functionality:
 
 ### Reading and writing data
 The `fetch` method mimics
-the browser's [`fetch` API]((https://fetch.spec.whatwg.org/)).
+the browser's [`fetch` API]((https://fetch.spec.whatwg.org/)): 
+it has the same signature and also returns a promise that resolves to the response to the request.
 You can use it to access any kind of HTTP(S) document,
 regardless of whether that document is on a Solid pod:
 
@@ -87,7 +98,7 @@ async function login(idp) {
   else
     alert(`Logged in as ${session.webId}`);
 }
-login('https://solid.community');
+login('https://solidcommunity.net');
 ```
 Be aware that this will _redirect_ the user away from your application
 to their identity provider.
@@ -98,7 +109,7 @@ then you can use a popup window:
 ```javascript
 async function popupLogin() {
   let session = await solid.auth.currentSession();
-  let popupUri = 'https://solid.community/common/popup.html';
+  let popupUri = 'https://solidcommunity.net/common/popup.html';
   if (!session)
     session = await solid.auth.popupLogin({ popupUri });
   alert(`Logged in as ${session.webId}`);
@@ -154,6 +165,31 @@ and emits the following events:
 - `logout ()` when a user logs out
 - `session (session: Session | null)` when a user logs in or out
 
+### Client registration
+
+`SolidAuthClient` automatically registers your OIDC client application if it is
+unknown to the authorization server, following
+[the registration request spec](https://openid.net/specs/openid-connect-registration-1_0.html#RegistrationRequest).
+
+You can specify some fields of this registration request by passing them to the
+`loginSession` parameter of `solid.auth.login`.
+
+Supported fields are:
+
+*  `client_name` and internationalized variants (`clientName` property)
+* `contacts` (`contacts` property)
+* `logo_uri` (`logoUri` property)
+
+**Example**:
+
+```js
+solid.auth.login(idp, {
+    clientName: 'My Example',
+    'clientName#ja-Jpan-JP': 'クライアント名',
+    logoUri: 'https://client.example.org/logo.png',
+    contacts: ['ve7jtb@example.org', 'mary@example.org']
+})
+````
 
 ## Advanced usage
 
@@ -181,7 +217,7 @@ $ solid-auth-client generate-popup # ["My App Name"] [my-app-popup.html]
 
 
 ## Developing `solid-auth-client`
-Developing this library requires [Node.js](https://nodejs.org/en/) >= v8.0.
+Developing this library requires [Node.js](https://nodejs.org/en/) >= v10.0.
 
 ### Setting up the development environment
 
@@ -200,7 +236,7 @@ You can test how `solid-auth-client` operates within an app by running the demo 
 #### Running the demo development server
 
 ```sh
-$ POPUP_URI='http://localhost:8081/popup-template.html' npm run start:demo
+$ POPUP_URI='http://localhost:8606/popup-template.html' npm run start:demo
 ```
 
 #### Running the popup development server
