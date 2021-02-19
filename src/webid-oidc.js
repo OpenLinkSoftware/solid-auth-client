@@ -1,8 +1,9 @@
 // @flow
-/* global RequestInfo, Response */
+/* global Response */
 import * as authorization from 'auth-header'
+
 import RelyingParty from '@solid/oidc-rp'
-import PoPToken from '@solid/oidc-rp/lib/PoPToken'
+import PoPToken from '@solid/oidc-rp/src/PoPToken'
 
 import type { loginOptions } from './solid-auth-client'
 import { currentUrl, navigateTo, toUrlString } from './url-util'
@@ -52,7 +53,7 @@ export async function currentSession(
     return {
       ...session,
       webId: session.idClaims.sub,
-      idp: session.issuer
+      idp: session.issuer,
     }
   } catch (err) {
     console.warn('Error finding a WebID-OIDC session')
@@ -75,6 +76,10 @@ export async function logout(
         await fetch('/.well-known/solid/logout', { credentials: 'include' })
       } catch (e) {
         // Ignore errors for when we are not on a Solid pod
+        // But tell users it is harmless because they will see the GET failure in the console
+        console.info(
+          "Couldn't find /.well-known/solid/logout, this is harmless."
+        )
       }
     } catch (err) {
       console.warn('Error logging out of the WebID-OIDC session')
@@ -118,34 +123,54 @@ async function storeRp(
   idp: string,
   rp: RelyingParty
 ): Promise<RelyingParty> {
-  await updateStorage(storage, data => ({
+  await updateStorage(storage, (data) => ({
     ...data,
-    rpConfig: rp
+    rpConfig: rp,
   }))
   return rp
 }
 
-function registerRp(
-  idp: string,
-  { storage, callbackUri }: loginOptions
-): Promise<RelyingParty> {
+function registerRp(idp: string, opts: loginOptions): Promise<RelyingParty> {
+  const { storage, callbackUri } = opts
   const responseType = 'id_token token'
+
+  const clientNameI18n = {}
+  Object.entries(opts)
+    .filter(([key, _]) => key.startsWith('clientName#'))
+    .forEach(
+      ([key, value]) =>
+        (clientNameI18n[key.replace('clientName#', 'client_name#')] = value)
+    )
+
+  const supplementaryOptions = {
+    logo_uri: opts.logoUri,
+    contacts: opts.contacts,
+    client_name: opts.clientName,
+  }
+
   const registration = {
     issuer: idp,
     grant_types: ['implicit'],
     redirect_uris: [callbackUri],
     response_types: [responseType],
-    scope: 'openid profile'
+    scope: 'openid profile',
+    ...clientNameI18n,
+    ...supplementaryOptions,
   }
+
+  // Note that overrides @solid/oidc-rp/RelyingParty defaults (i.e. not merged)
   const options = {
     defaults: {
       authenticate: {
         redirect_uri: callbackUri,
-        response_type: responseType
-      }
+        response_type: responseType,
+        display: 'page',
+        scope: ['openid'],
+      },
     },
-    store: storage
+    store: storage,
   }
+
   return RelyingParty.register(idp, registration, options)
 }
 
@@ -160,9 +185,9 @@ async function sendAuthRequest(
 }
 
 async function saveAppHashFragment(store: AsyncStorage): Promise<void> {
-  await updateStorage(store, data => ({
+  await updateStorage(store, (data) => ({
     ...data,
-    appHashFragment: window.location.hash
+    appHashFragment: window.location.hash,
   }))
 }
 
@@ -199,17 +224,12 @@ export function requiresAuth(resp: Response): boolean {
 export async function fetchWithCredentials(
   session: webIdOidcSession,
   fetch: Function,
-  input: RequestInfo,
+  input: any,
   options?: RequestOptions
 ): Promise<Response> {
+  // Add Authorization header (assuming a modifiable headers object)
+  const headers: any = (options ? options.headers : input.headers) || {}
   const popToken = await PoPToken.issueFor(toUrlString(input), session)
-  const authenticatedOptions = {
-    ...options,
-    credentials: 'include',
-    headers: {
-      ...(options && options.headers ? options.headers : {}),
-      authorization: `Bearer ${popToken}`
-    }
-  }
-  return fetch(input, authenticatedOptions)
+  headers.authorization = `Bearer ${popToken}`
+  return fetch(input, { ...options, credentials: 'include', headers })
 }

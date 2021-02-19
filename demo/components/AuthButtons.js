@@ -7,7 +7,7 @@ const popupUri = process.env.POPUP_URI
 export default class AuthButtons extends React.Component<Object, Object> {
   constructor(props: {}) {
     super(props)
-    auth.trackSession(session => this.setState({ loggedIn: !!session }))
+    auth.trackSession((session) => this.setState({ loggedIn: !!session }))
   }
 
   logout() {
@@ -17,7 +17,7 @@ export default class AuthButtons extends React.Component<Object, Object> {
   login() {
     const idp = window.prompt(
       'What is the URL of your identity provider?',
-      'https://solidtest.space/'
+      'https://solidcommunity.net/'
     )
     if (idp) {
       auth.login(idp)

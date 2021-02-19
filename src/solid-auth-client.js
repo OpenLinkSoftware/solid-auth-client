@@ -15,8 +15,11 @@ const globalFetch = fetch
 
 export type loginOptions = {
   callbackUri: string,
+  clientName?: string,
+  contacts?: Array<string>,
+  logoUri?: string,
   popupUri: string,
-  storage: AsyncStorage
+  storage: AsyncStorage,
 }
 
 export default class SolidAuthClient extends EventEmitter {
@@ -83,6 +86,10 @@ export default class SolidAuthClient extends EventEmitter {
     this.on('session', callback)
   }
 
+  stopTrackSession(callback: Function): void {
+    this.removeListener('session', callback)
+  }
+
   async logout(storage: AsyncStorage = defaultStorage()): Promise<void> {
     const session = await getSession(storage)
     if (session) {
@@ -103,6 +110,6 @@ function defaultLoginOptions(url: ?string): loginOptions {
   return {
     callbackUri: url ? url.split('#')[0] : '',
     popupUri: '',
-    storage: defaultStorage()
+    storage: defaultStorage(),
   }
 }
